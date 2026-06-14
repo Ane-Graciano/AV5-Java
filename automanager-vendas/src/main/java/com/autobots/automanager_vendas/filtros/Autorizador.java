@@ -4,11 +4,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -16,6 +11,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.autobots.automanager_vendas.jwt.ProvedorJwt;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 public class Autorizador extends OncePerRequestFilter {
 
@@ -37,7 +37,19 @@ public class Autorizador extends OncePerRequestFilter {
 
             List<GrantedAuthority> authorities = new ArrayList<>();
             if (perfis != null) {
-                perfis.forEach(perfil -> authorities.add(new SimpleGrantedAuthority(perfil)));
+                perfis.forEach(perfil -> {
+                    String nomePerfilComRole = perfil;
+                    
+                    // Limpeza preventiva contra o bug de string duplicada vinda do Token
+                    if (nomePerfilComRole.startsWith("ROLE_ROLE_")) {
+                        nomePerfilComRole = nomePerfilComRole.replace("ROLE_ROLE_", "ROLE_");
+                    } else if (!nomePerfilComRole.startsWith("ROLE_")) {
+                        // Garante o prefixo se a string vier pura do banco/token
+                        nomePerfilComRole = "ROLE_" + nomePerfilComRole;
+                    }
+                    
+                    authorities.add(new SimpleGrantedAuthority(nomePerfilComRole));
+                });
             }
 
             UsernamePasswordAuthenticationToken autenticacao = 

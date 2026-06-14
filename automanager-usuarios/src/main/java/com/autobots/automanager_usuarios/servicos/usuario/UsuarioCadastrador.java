@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.autobots.automanager_usuarios.enumeracoes.PerfilUsuario;
@@ -16,6 +17,9 @@ public class UsuarioCadastrador {
 
     @Autowired
     private UsuarioRepositorio repositorio;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     private Usuario converterUsuarioDTO(UsuarioDto usuarioDto) {
         Usuario usuario = new Usuario();
@@ -46,7 +50,7 @@ public class UsuarioCadastrador {
     public Usuario cadastrar(UsuarioDto usuarioDto, String usuarioLogado, Long idEmpresa) {
         Usuario funcionarioLogado = repositorio.findByNomeUsuario(usuarioLogado)
                 .orElseThrow(() -> new RuntimeException("Funcionário logado não encontrado!"));
-        
+
         Usuario usuario = converterUsuarioDTO(usuarioDto);
 
         if (funcionarioLogado.getPerfis().contains(PerfilUsuario.ROLE_VENDEDOR)) {
@@ -55,9 +59,9 @@ public class UsuarioCadastrador {
             }
         }
         if (funcionarioLogado.getPerfis().contains(PerfilUsuario.ROLE_GERENTE)) {
-            if (!usuario.getPerfis().contains(PerfilUsuario.ROLE_CLIENTE) && 
-                !usuario.getPerfis().contains(PerfilUsuario.ROLE_VENDEDOR) && 
-                !usuario.getPerfis().contains(PerfilUsuario.ROLE_GERENTE)) {
+            if (!usuario.getPerfis().contains(PerfilUsuario.ROLE_CLIENTE)
+                    && !usuario.getPerfis().contains(PerfilUsuario.ROLE_VENDEDOR)
+                    && !usuario.getPerfis().contains(PerfilUsuario.ROLE_GERENTE)) {
                 throw new RuntimeException("Acesso Negado: Gerentes só possuem permissão para cadastrar Clientes, Vendedores ou Gerentes.");
             }
         }
@@ -69,7 +73,21 @@ public class UsuarioCadastrador {
         if (usuario.getId() != null && repositorio.existsById(usuario.getId())) {
             throw new RuntimeException("ID do usuário já existe na base de dados");
         }
-        
+
+        if (usuario.getCredenciais() != null) {
+            usuario.getCredenciais().forEach(credencial -> {
+                if (credencial instanceof com.autobots.automanager_usuarios.modelo.CredencialUsuarioSenha) {
+                    com.autobots.automanager_usuarios.modelo.CredencialUsuarioSenha credencialSenha
+                            = (com.autobots.automanager_usuarios.modelo.CredencialUsuarioSenha) credencial;
+
+                    if (credencialSenha.getSenha() != null && !credencialSenha.getSenha().isEmpty()) {
+                        String senhaCriptografada = passwordEncoder.encode(credencialSenha.getSenha());
+                        credencialSenha.setSenha(senhaCriptografada);
+                    }
+                }
+            });
+        }
+
         return repositorio.save(usuario);
     }
 
